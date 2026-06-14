@@ -1,0 +1,271 @@
+{
+  "spreadsheetId": "1jy5o7FqHbsKkurjPmBosOE-SnpDuCkm5Z4-bullnZUw",
+  "companyInfo": {
+    "name": "Fardos Ecomoda",
+    "phone": "+504 9547-1667",
+    "address": "Comayagua Comayagua, Calle Principal contigo a estadio carlos miranda",
+    "hours": "Lunes a Sábado: 9:00 AM - 7:00 PM | Domingo: 10:00 AM - 5:00 PM",
+    "bankDetails": "BAC Credomatic - Cuenta de Ahorros: 750924172\nA nombre de: Ecomoda S. de R. L.",
+    "cashDiscountPercent": 2
+  },
+  "orders": [
+    {
+      "id": "ORD-1002",
+      "fecha": "2026-06-14T02:32:02.567Z",
+      "clienteNombre": "Kevin Sanchez",
+      "clienteEmail": "kevinsanchezp7@gmail.com",
+      "clienteTelefono": "+504 96136001",
+      "clienteDireccion": "Comayagua\nComayagua",
+      "clienteNotas": "dejar en tienda",
+      "paymentMethod": "Tarjeta",
+      "items": [
+        {
+          "id": "5",
+          "nombre": "T-Shirt Estampado Gráfico",
+          "talla": "XL",
+          "categoria": "Camisetas",
+          "precioNormal": 150,
+          "precioEfectivo": 130,
+          "imagen": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&q=80",
+          "cantidad": 3
+        },
+        {
+          "id": "1",
+          "nombre": "Chaqueta Denim Vintage - Levi's",
+          "talla": "M",
+          "categoria": "Chaquetas",
+          "precioNormal": 450,
+          "precioEfectivo": 400,
+          "imagen": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=500&q=80",
+          "cantidad": 1
+        }
+      ],
+      "totalNormal": 900,
+      "totalEfectivo": 790,
+      "totalDescuento": 110,
+      "status": "Pendiente",
+      "usuarioVendedor": "Usuario 1"
+    },
+    {
+      "id": "ORD-1001",
+      "fecha": "2026-06-12T14:24:30.824Z",
+      "clienteNombre": "Sofía Montes",
+      "clienteEmail": "sofia@example.com",
+      "clienteTelefono": "+504 9876-5432",
+      "clienteDireccion": "Colonia Palmira, casa 45B",
+      "clienteNotas": "Por favor empacar con cuidado.",
+      "paymentMethod": "Efectivo",
+      "items": [
+        {
+          "id": "1",
+          "nombre": "Chaqueta Denim Vintage - Levi's",
+          "talla": "M",
+          "categoria": "Chaquetas",
+          "precioNormal": 450,
+          "precioEfectivo": 400,
+          "imagen": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=500&q=80",
+          "cantidad": 1
+        }
+      ],
+      "totalNormal": 450,
+      "totalEfectivo": 400,
+      "totalDescuento": 50,
+      "status": "Confirmado"
+    },
+    {
+      "id": "ORD-1002",
+      "fecha": "2026-06-13T14:24:30.824Z",
+      "clienteNombre": "Carlos Rivas",
+      "clienteEmail": "carlos.rivas@example.com",
+      "clienteTelefono": "+504 3322-1100",
+      "clienteDireccion": "Residencial Plaza, Bloque C, Casa 12",
+      "clienteNotas": "Favor llamar antes de llegar.",
+      "paymentMethod": "Transferencia",
+      "items": [
+        {
+          "id": "2",
+          "nombre": "Suéter Tommy Hilfiger Retro",
+          "talla": "L",
+          "categoria": "Suéteres",
+          "precioNormal": 380,
+          "precioEfectivo": 340,
+          "imagen": "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=500&q=80",
+          "cantidad": 1
+        },
+        {
+          "id": "4",
+          "nombre": "Blusa de Seda Estampada",
+          "talla": "S",
+          "categoria": "Blusas",
+          "precioNormal": 200,
+          "precioEfectivo": 180,
+          "imagen": "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=500&q=80",
+          "cantidad": 1
+        }
+      ],
+      "totalNormal": 580,
+      "totalEfectivo": 520,
+      "totalDescuento": 60,
+      "status": "Pendiente"
+    }
+  ],
+  "productOverrides": {
+    "1": {
+      "imagen": "/uploads/WhatsApp_Image_2026-06-12_at_4_30_44_PM__1__1781404817110.jpeg",
+      "visible": true
+    }
+  },
+  "cachedProducts": [
+    {
+      "id": "1",
+      "nombre": "Chaqueta Denim Vintage - Levi's",
+      "categoria": "Chaquetas",
+      "talla": "M",
+      "precioNormal": 450,
+      "precioEfectivo": 400,
+      "descuento": 11,
+      "imagen": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=500&q=80",
+      "stock": 4,
+      "visible": true
+    },
+    {
+      "id": "2",
+      "nombre": "Suéter Tommy Hilfiger Retro",
+      "categoria": "Suéteres",
+      "talla": "L",
+      "precioNormal": 380,
+      "precioEfectivo": 340,
+      "descuento": 10,
+      "imagen": "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=500&q=80",
+      "stock": 3,
+      "visible": true
+    },
+    {
+      "id": "3",
+      "nombre": "Jeans High Waist Mom",
+      "categoria": "Pantalones",
+      "talla": "S",
+      "precioNormal": 320,
+      "precioEfectivo": 280,
+      "descuento": 12,
+      "imagen": "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=500&q=80",
+      "stock": 4,
+      "visible": true
+    },
+    {
+      "id": "4",
+      "nombre": "Blusa de Seda Estampada",
+      "categoria": "Blusas",
+      "talla": "S",
+      "precioNormal": 200,
+      "precioEfectivo": 180,
+      "descuento": 10,
+      "imagen": "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=500&q=80",
+      "stock": 8,
+      "visible": true
+    },
+    {
+      "id": "5",
+      "nombre": "T-Shirt Estampado Gráfico",
+      "categoria": "Camisetas",
+      "talla": "XL",
+      "precioNormal": 150,
+      "precioEfectivo": 130,
+      "descuento": 13,
+      "imagen": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&q=80",
+      "stock": 9,
+      "visible": true
+    }
+  ],
+  "cachedAt": 1781403870824,
+  "reviews": [],
+  "customers": [],
+  "users": [
+    {
+      "idUsuario": "USR-1",
+      "nombre": "Usuario 1",
+      "prefijoPais": "+504",
+      "contacto": "",
+      "correo": "",
+      "password": "",
+      "foto": "",
+      "rol": "Vendedor",
+      "estadoPerfil": "Activo",
+      "ultimoAcceso": ""
+    },
+    {
+      "idUsuario": "USR-9",
+      "nombre": "Usuario 9",
+      "prefijoPais": "+504",
+      "contacto": "",
+      "correo": "",
+      "password": "",
+      "foto": "",
+      "rol": "Vendedor",
+      "estadoPerfil": "Activo",
+      "ultimoAcceso": ""
+    },
+    {
+      "idUsuario": "USR-10",
+      "nombre": "Usuario 10",
+      "prefijoPais": "+504",
+      "contacto": "",
+      "correo": "",
+      "password": "",
+      "foto": "",
+      "rol": "Vendedor",
+      "estadoPerfil": "Activo",
+      "ultimoAcceso": ""
+    },
+    {
+      "idUsuario": "USR-11",
+      "nombre": "Usuario 11",
+      "prefijoPais": "+504",
+      "contacto": "",
+      "correo": "",
+      "password": "",
+      "foto": "",
+      "rol": "Vendedor",
+      "estadoPerfil": "Activo",
+      "ultimoAcceso": ""
+    },
+    {
+      "idUsuario": "USR-12",
+      "nombre": "Usuario 12",
+      "prefijoPais": "+504",
+      "contacto": "",
+      "correo": "",
+      "password": "",
+      "foto": "",
+      "rol": "Vendedor",
+      "estadoPerfil": "Activo",
+      "ultimoAcceso": ""
+    },
+    {
+      "idUsuario": "USR-13",
+      "nombre": "Usuario 13",
+      "prefijoPais": "+504",
+      "contacto": "",
+      "correo": "",
+      "password": "",
+      "foto": "",
+      "rol": "Vendedor",
+      "estadoPerfil": "Activo",
+      "ultimoAcceso": ""
+    },
+    {
+      "idUsuario": "USR-14",
+      "nombre": "Usuario 14",
+      "prefijoPais": "+504",
+      "contacto": "",
+      "correo": "",
+      "password": "",
+      "foto": "",
+      "rol": "Vendedor",
+      "estadoPerfil": "Activo",
+      "ultimoAcceso": ""
+    }
+  ],
+  "googleToken": null,
+  "appsScriptUrl": "https://script.google.com/macros/s/AKfycbyZUIRYIfK2GuhvrZq-1HaVrAr2yFVGGzQKqggJX1X_jRtawEiHU_kGFgvaDOiIm257Cg/exec"
+}
