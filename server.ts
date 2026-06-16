@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { google } from "googleapis";
+import { GoogleGenAI, Type } from "@google/genai";
 
 // Local database file path
 const DB_FILE = path.join(process.cwd(), "db.json");
@@ -969,6 +970,106 @@ async function startServer() {
     }
 
     res.json({ success: true, review: newReview });
+  });
+
+  // AI-powered shopper assistant
+  app.post("/api/ai-assistant", async (req, res) => {
+    const { text, products } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: "Por favor proporciona un mensaje u observación para el asistente." });
+    }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        error: "El Asistente de inteligencia artificial no está configurado aún. Por favor añade la clave GEMINI_API_KEY en Panel de Ajustes > Secrets."
+      });
+    }
+
+    try {
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
+        },
+      });
+
+      // Filter products that have stock > 0 and are visible to not recommend out of stock ones
+      const availableProducts = (products || []).filter((p: any) => p.stock > 0 && p.visible !== false);
+
+      const catalogData = availableProducts.map((p: any) => ({
+        id: p.id,
+        nombre: p.nombre,
+        categoria: p.categoria || "Ropa",
+        precioNormal: p.precioNormal,
+        precioEfectivo: p.precioEfectivo,
+        descripcion: p.descripcion || "",
+        stock: p.stock
+      }));
+
+      const prompt = `Analiza la siguiente solicitud del cliente: "${text}"
+
+Basándote únicamente en el catálogo actual de fardos (inventario disponible) que te proporciono abajo, calcula la mejor combinación de fardos para surtir su negocio.
+REGLA PRINCIPAL: La suma total de los precios (precioEfectivo o precioNormal) de todos los fardos recomendados NO puede exceder el presupuesto expresado por el usuario (si el usuario menciona un presupuesto, interprétalo, por ejemplo "L.15,000" o "15 mil" significa Lempiras 15,000). Si no definen un presupuesto, asume un presupuesto recomendando un buen mix de fardos útiles de manera razonable.
+REGLA DE RELEVANCIA: Pon especial atención a lo que el usuario pide (ej. prendas de niños de 7 a 14 años, juveniles de hombres o mujeres, fardos de calidad especial, etc.). No inventes productos que no estén en la lista de abajo!
+
+Lista de inventario disponible actual:
+${JSON.stringify(catalogData, null, 2)}
+`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          systemInstruction: "Eres un asesor experto de ventas de fardos y lotes de ropa para una distribuidora de fardos de ropa de alta calidad llamada EcoModa. Tu meta es analizar el presupuesto y preferencias del cliente y sugerir qué fardos/productos de la lista de inventario disponible les conviene comprar. Explica detalladamente y con empatía en español por qué les conviene cada producto sugerido. Asegúrate de que la suma de los precios no supere el presupuesto del usuario.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              rawReasoning: {
+                type: Type.STRING,
+                description: "Un saludo amigable y un análisis detallado del presupuesto, explicando la estrategia de compra para su negocio, con consejos de venta, sugerencias y un tono muy motivador."
+              },
+              recommendations: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    productId: {
+                      type: Type.STRING,
+                      description: "El ID o código del producto recomendado (debe coincidir exactamente con uno de los fardos provistos en la lista)."
+                    },
+                    quantity: {
+                      type: Type.INTEGER,
+                      description: "La cantidad sugerida de este fardo (debe ser menor o igual al stock disponible de ese producto)."
+                    },
+                    whyNeeded: {
+                      type: Type.STRING,
+                      description: "Breve explicación de por qué este fardo en particular se ajusta a su presupuesto, a su público meta (ej. niños o juveniles o adultos) y cómo sacarle ganancia."
+                    }
+                  },
+                  required: ["productId", "quantity", "whyNeeded"]
+                },
+                description: "Listado de fardos del catálogo actual que deberían comprar de acuerdo a su solicitud."
+              }
+            },
+            required: ["rawReasoning", "recommendations"]
+          }
+        }
+      });
+
+      if (!response || !response.text) {
+        throw new Error("El modelo de IA devolvió una respuesta vacía.");
+      }
+
+      const result = JSON.parse(response.text.trim());
+      res.json({ success: true, ...result });
+
+    } catch (error: any) {
+      console.error("AI Assistant Error:", error);
+      res.status(500).json({ error: "Fallo al procesar la sugerencia con Inteligencia Artificial: " + (error.message || error) });
+    }
   });
 
   // ==========================================

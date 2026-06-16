@@ -13,7 +13,12 @@ import {
   MessageSquare,
   Truck,
   Package,
-  Heart
+  Heart,
+  Mic,
+  Send,
+  AlertCircle,
+  ShoppingCart,
+  Check
 } from "lucide-react";
 import { Product, CompanyInfo, Review, Order } from "../types";
 import { motion, AnimatePresence } from "motion/react";
@@ -113,6 +118,143 @@ export default function ClientShop({
   const [showInfo, setShowInfo] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
+  // AI assistant states
+  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiResult, setAiResult] = useState<{
+    rawReasoning: string;
+    recommendations: Array<{
+      productId: string;
+      quantity: number;
+      whyNeeded: string;
+    }>;
+  } | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiAddedCount, setAiAddedCount] = useState<Record<string, number>>({});
+
+  const handleToggleListening = () => {
+    const SpeechRecognitionImpl = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionImpl) {
+      alert("🎤 Disculpa, la transcripción de voz no está soportada en este navegador. Por favor escribe tu consulta.");
+      return;
+    }
+
+    if (isListening) {
+      if ((window as any)._aiRecognition) {
+        try {
+          ((window as any)._aiRecognition).stop();
+        } catch (e) {}
+      }
+      setIsListening(false);
+    } else {
+      try {
+        const rec = new SpeechRecognitionImpl();
+        rec.lang = "es-HN";
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+
+        rec.onstart = () => {
+          setIsListening(true);
+        };
+        rec.onend = () => {
+          setIsListening(false);
+        };
+        rec.onerror = () => {
+          setIsListening(false);
+        };
+        rec.onresult = (event: any) => {
+          const resultText = event.results[0][0].transcript;
+          setAiPrompt(prev => prev + (prev.trim() ? " " : "") + resultText);
+        };
+
+        (window as any)._aiRecognition = rec;
+        rec.start();
+      } catch (err) {
+        console.error("Failed to start speech recognition:", err);
+        setIsListening(false);
+      }
+    }
+  };
+
+  const handleGetAiRecommendations = async () => {
+    if (!aiPrompt.trim()) {
+      setAiError("Por favor escribe o habla tu presupuesto/público de fardos.");
+      return;
+    }
+    setIsAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
+    setAiAddedCount({});
+
+    try {
+      const response = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: aiPrompt,
+          products: products
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Ocurrió un error en el servidor.");
+      }
+
+      if (data.success) {
+        setAiResult(data);
+      } else {
+        throw new Error(data.error || "No se pudo generar la recomendación.");
+      }
+    } catch (err: any) {
+      setAiError(err.message || "Error al conectar con el Asistente de IA.");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handleAddAiItemToCart = (prodId: string, qty: number) => {
+    const prod = products.find(p => p.id === prodId);
+    if (!prod) return;
+    
+    // Add multiple
+    for (let i = 0; i < qty; i++) {
+      onAddToCart(prod);
+    }
+    setAiAddedCount(prev => ({
+      ...prev,
+      [prodId]: (prev[prodId] || 0) + qty
+    }));
+  };
+
+  const handleAddAllAiItemsToCart = () => {
+    if (!aiResult || !aiResult.recommendations) return;
+    
+    let addedCount = 0;
+    aiResult.recommendations.forEach(rec => {
+      const prod = products.find(p => p.id === rec.productId);
+      if (prod && prod.stock > 0) {
+        const qtyToAdd = Math.min(rec.quantity, prod.stock);
+        for (let i = 0; i < qtyToAdd; i++) {
+          onAddToCart(prod);
+        }
+        setAiAddedCount(prev => ({
+          ...prev,
+          [rec.productId]: (prev[rec.productId] || 0) + qtyToAdd
+        }));
+        addedCount++;
+      }
+    });
+
+    if (addedCount > 0) {
+      alert("🎉 ¡Se agregaron todas las sugerencias disponibles al carrito de compras!");
+    } else {
+      alert("⚠️ No hay productos disponibles con stock en esta recomendación.");
+    }
+  };
+
   // Derive unique categories
   const categories = useMemo(() => {
     const list = new Set(products.map(p => p.categoria));
@@ -156,6 +298,14 @@ export default function ClientShop({
           </div>
 
           <div className="mt-2.5 md:mt-0 flex gap-1.5 sm:gap-2.5 flex-wrap">
+            <button
+              onClick={() => setIsAiAssistantOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-linear-to-r from-teal-550 via-emerald-500 to-lime-500 hover:brightness-110 text-white font-black text-xs sm:text-sm transition-all border border-white/10 cursor-pointer shadow-md shadow-emerald-950/25 active:scale-95 animate-pulse"
+              style={{ animationDuration: "3s" }}
+            >
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200 shrink-0" />
+              Asesor de Compras AI
+            </button>
             <button
               onClick={() => setShowInfo(!showInfo)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs sm:text-sm transition-all border border-white/10 cursor-pointer"
@@ -1066,6 +1216,258 @@ export default function ClientShop({
             </span>
             <span className="hidden sm:inline font-bold text-xs uppercase tracking-wider pr-1">Ver Bolsa</span>
           </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* AI Shopper Assistant Modal */}
+      <AnimatePresence>
+        {isAiAssistantOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isAiLoading) setIsAiAssistantOpen(false);
+              }}
+              className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 30 }}
+              className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden relative z-10 border border-slate-100 flex flex-col max-h-[92vh]"
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-teal-900 via-emerald-800 to-lime-800 p-5 sm:p-6 text-white flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-white/10 rounded-xl">
+                    <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm sm:text-base leading-tight">Asesor Personal de Compras AI</h3>
+                    <p className="text-[10px] text-emerald-100/95 mt-0.5 font-medium">EcoModa calcula y te arma el fardo ideal para tu presupuesto</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={isAiLoading}
+                  onClick={() => setIsAiAssistantOpen(false)}
+                  className="p-1.5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-white disabled:opacity-55"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+                
+                {/* Solicitud Box */}
+                <div className="space-y-2">
+                  <label className="block font-black text-slate-700 uppercase tracking-wider text-[10px]">
+                    Explícale tu presupuesto y público objetivo a la IA:
+                  </label>
+                  <div className="relative border border-slate-200 focus-within:border-emerald-500 rounded-2xl p-2.5 bg-slate-50 focus-within:bg-white transition-all">
+                    <textarea
+                      rows={3}
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="Ej: Hola, tengo un presupuesto de L.20,000 para comprar prendas juveniles y algo de niños entre 8 a 12 años. ¿Qué fardos disponibles me recomiendas pedir para ganarle bastante y que me ajuste?"
+                      className="w-full bg-transparent border-0 focus:ring-0 p-0 text-slate-800 font-medium placeholder-slate-400 focus:outline-hidden text-xs sm:text-sm resize-none"
+                    />
+                    
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-200/60">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handleToggleListening}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-extrabold cursor-pointer transition-all ${
+                            isListening
+                              ? "bg-rose-600 text-white animate-bounce"
+                              : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-150"
+                          }`}
+                          title="Hacer dictado por voz"
+                        >
+                          <Mic className={`w-3.5 h-3.5 ${isListening ? "animate-pulse" : ""}`} />
+                          {isListening ? "¡Escuchando voz...!" : "🎙️ Tocar para Hablar"}
+                        </button>
+                        
+                        {isListening && (
+                          <span className="text-[10px] text-rose-500 font-bold animate-pulse">Habla ahora... tu voz se transcribirá sola</span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isAiLoading || !aiPrompt.trim()}
+                        onClick={handleGetAiRecommendations}
+                        className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-1.5 px-4 rounded-xl cursor-pointer shadow-3xs transition-all active:scale-95 text-[11px]"
+                      >
+                        <Send className="w-3 h-3" />
+                        Analizar Presupuesto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Loader */}
+                {isAiLoading && (
+                  <div className="py-8 text-center space-y-3">
+                    <div className="relative inline-flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full border-4 border-emerald-150 border-t-emerald-600 animate-spin"></div>
+                      <Sparkles className="w-5 h-5 text-amber-500 animate-ping absolute" />
+                    </div>
+                    <p className="font-extrabold text-slate-800 text-sm">Procesando sugerencias con Inteligencia Artificial...</p>
+                    <p className="text-[10px] text-slate-400 max-w-sm mx-auto">
+                      EcoModa AI está simulando la suma de precios, comprobando la existencia de los fardos y seleccionando el mejor surtido exclusivo para tu negocio.
+                    </p>
+                  </div>
+                )}
+
+                {/* Error */}
+                {aiError && (
+                  <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl flex gap-3 text-[11px] text-rose-800">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                    <div>
+                      <span className="font-black">Ocurrió un inconveniente:</span>
+                      <p className="mt-0.5 font-medium">{aiError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Results Screen */}
+                {aiResult && (
+                  <div className="space-y-5">
+                    {/* Raw reasoning text */}
+                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/10 rounded-full translate-x-12 -translate-y-12"></div>
+                      <h4 className="font-black text-slate-900 text-xs sm:text-sm flex items-center gap-1.5 mb-2 relative z-10">
+                        <Sparkles className="w-4 h-4 text-emerald-600" />
+                        Estrategia de Surtido Recomendada:
+                      </h4>
+                      <p className="text-slate-700 leading-relaxed text-[11px] sm:text-xs font-medium whitespace-pre-line relative z-10">
+                        {aiResult.rawReasoning}
+                      </p>
+                    </div>
+
+                    {/* Recommendations grid */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-black text-slate-700 uppercase tracking-wider text-[10px]">
+                          Fardos Recomendados en Bodega ({aiResult.recommendations.length}):
+                        </h4>
+                        
+                        <button
+                          type="button"
+                          onClick={handleAddAllAiItemsToCart}
+                          className="inline-flex items-center gap-1 text-emerald-855 text-emerald-700 bg-emerald-100 hover:bg-emerald-200 font-extrabold text-[10px] px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+                        >
+                          <ShoppingCart className="w-3 h-3 text-emerald-600" />
+                          Agregar Todo Recomendado
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {aiResult.recommendations.map((rec) => {
+                          const matchedProduct = products.find(p => p.id === rec.productId);
+                          const quantityAlreadyInCart = aiAddedCount[rec.productId] || 0;
+                          
+                          if (!matchedProduct) {
+                            return (
+                              <div key={rec.productId} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between opacity-60">
+                                <div>
+                                  <span className="font-black text-slate-650 font-mono text-[9px] block">CÓDIGO: {rec.productId}</span>
+                                  <span className="text-[10px] font-bold text-slate-500">Este fardo ya se vendió por completo o no tiene stock</span>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={rec.productId} className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-col justify-between hover:shadow-xs transition-shadow">
+                              <div className="flex gap-3">
+                                {matchedProduct.imagen ? (
+                                  <img
+                                    src={matchedProduct.imagen}
+                                    alt=""
+                                    className="w-12 h-12 rounded-xl object-cover bg-slate-50 shrink-0"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">COD</div>
+                                )}
+
+                                <div className="space-y-0.5 min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 text-[9px] font-mono font-bold text-slate-400">
+                                    <span className="text-emerald-600">COD: {rec.productId}</span>
+                                    <span>&bull;</span>
+                                    <span className="uppercase text-slate-500 bg-slate-100 px-1 py-0.2 rounded">{matchedProduct.categoria}</span>
+                                  </div>
+                                  <h5 className="font-extrabold text-slate-900 leading-tight truncate">{matchedProduct.nombre}</h5>
+                                  <span className="block font-black text-emerald-800 text-[11px]">
+                                    L. {matchedProduct.precioEfectivo.toLocaleString()} (EFE) / L. {matchedProduct.precioNormal.toLocaleString()} (REG)
+                                  </span>
+                                  <span className="block text-[9px] text-slate-400">Disponibles en bodega: {matchedProduct.stock} unidades</span>
+                                </div>
+                              </div>
+
+                              <div className="mt-2 text-[10.5px] bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-slate-600 font-medium leading-relaxed">
+                                <span className="font-bold text-slate-800 block text-[9.5px] mb-0.5">💡 ¿Por qué te conviene?</span>
+                                {rec.whyNeeded}
+                              </div>
+
+                              <div className="mt-3 pt-2 border-t border-slate-100 flex justify-between items-center">
+                                <span className="text-[10.5px] font-bold text-slate-800">
+                                  Sugerido: <strong className="text-emerald-700 font-black">{rec.quantity} fardos</strong>
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddAiItemToCart(rec.productId, Math.min(rec.quantity, matchedProduct.stock))}
+                                  className={`inline-flex items-center gap-1 py-1.5 px-3.5 rounded-xl font-bold transition-all cursor-pointer text-[10px] ${
+                                    quantityAlreadyInCart > 0
+                                      ? "bg-slate-100 text-slate-600 border border-slate-200"
+                                      : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-3xs"
+                                  }`}
+                                >
+                                  {quantityAlreadyInCart > 0 ? (
+                                    <>
+                                      <Check className="w-3 h-3 text-emerald-500 font-extrabold" />
+                                      {`Añadido (${quantityAlreadyInCart})`}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ShoppingCart className="w-3 h-3 shrink-0" />
+                                      {`Añadir fardo`}
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0">
+                <span className="text-[10px] text-slate-400 font-medium">EcoModa AI utiliza Gemini 3.5 Flash para asistencia</span>
+                <button
+                  type="button"
+                  disabled={isAiLoading}
+                  onClick={() => setIsAiAssistantOpen(false)}
+                  className="py-2 px-5 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cerrar Asistente
+                </button>
+              </div>
+
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
