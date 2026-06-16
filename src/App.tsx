@@ -125,6 +125,7 @@ export default function App() {
   // Callback action: reload from Sheets
   const handleRefreshData = async () => {
     await fetchProducts(true);
+    await fetchOrders();
   };
 
   // Callback action: update order status on backend

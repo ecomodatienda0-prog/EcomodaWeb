@@ -1268,6 +1268,47 @@ async function startServer() {
   // ==========================================
 
   // PRODUCTS CRUD
+  app.post("/api/products/bulk", async (req, res) => {
+    const db = getDB();
+    const importedProds = Array.isArray(req.body) ? req.body : (req.body.products || []);
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    importedProds.forEach((newProd: any) => {
+      if (!newProd.id) return;
+      const idx = db.cachedProducts.findIndex(p => p.id === newProd.id);
+      
+      const parsedProduct = {
+        id: String(newProd.id).trim(),
+        nombre: String(newProd.nombre || newProd.id).trim(),
+        categoria: String(newProd.categoria || "Fardos").trim(),
+        talla: String(newProd.talla || "Única").trim(),
+        precioNormal: Number(newProd.precioNormal) || Number(newProd.precioEfectivo) || 0,
+        precioEfectivo: Number(newProd.precioEfectivo) || Number(newProd.precioNormal) || 0,
+        descuento: Number(newProd.descuento) || 0,
+        imagen: String(newProd.imagen || "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=500&q=80").trim(),
+        stock: parseInt(String(newProd.stock)) >= 0 ? parseInt(String(newProd.stock)) : 1,
+        visible: (parseInt(String(newProd.stock)) >= 0 ? parseInt(String(newProd.stock)) : 1) > 0,
+        codigoSimple: newProd.codigoSimple ? String(newProd.codigoSimple).trim() : "",
+        fechaHasta: newProd.fechaHasta ? String(newProd.fechaHasta).trim() : "",
+        cantPiezas: Number(newProd.cantPiezas) || 0
+      };
+
+      if (idx !== -1) {
+        db.cachedProducts[idx] = { ...db.cachedProducts[idx], ...parsedProduct };
+        updatedCount++;
+      } else {
+        db.cachedProducts.push(parsedProduct);
+        addedCount++;
+      }
+    });
+
+    db.cachedAt = Date.now();
+    saveDB(db);
+    const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
+    res.json({ success: true, addedCount, updatedCount, syncError: syncRes.success ? null : syncRes.error });
+  });
+
   app.post("/api/products", async (req, res) => {
     const db = getDB();
     const newProd = req.body;
@@ -1424,12 +1465,29 @@ async function startServer() {
     const orderId = req.params.id;
     db.orders = db.orders.filter(o => o.id !== orderId);
     saveDB(db);
-    const sync1 = await syncTabToGoogleSheet(db, "Ventas");
-    const sync2 = await syncTabToGoogleSheet(db, "Ventas_Detalles");
-    const combinedError = (!sync1.success || !sync2.success)
-      ? [sync1.error, sync2.error].filter(Boolean).join(" | ")
-      : null;
-    res.json({ success: true, syncError: combinedError });
+
+    let syncError: string | null = null;
+
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const deletedVentas = await deleteRowWithAppsScript(db, "Ventas", 0, orderId);
+      const deletedDetalles = await deleteRowWithAppsScript(db, "Ventas_Detalles", 1, orderId);
+      if (!deletedVentas || !deletedDetalles) {
+        console.warn("Apps Script direct delete failed or was unsupported, falling back to full sheet rewrite sync...");
+        const sync1 = await syncTabToGoogleSheet(db, "Ventas");
+        const sync2 = await syncTabToGoogleSheet(db, "Ventas_Detalles");
+        syncError = (!sync1.success || !sync2.success)
+          ? [sync1.error, sync2.error].filter(Boolean).join(" | ")
+          : null;
+      }
+    } else {
+      const sync1 = await syncTabToGoogleSheet(db, "Ventas");
+      const sync2 = await syncTabToGoogleSheet(db, "Ventas_Detalles");
+      syncError = (!sync1.success || !sync2.success)
+        ? [sync1.error, sync2.error].filter(Boolean).join(" | ")
+        : null;
+    }
+
+    res.json({ success: true, syncError });
   });
 
   // Force-Full Sheets Sync endpoint
@@ -1535,6 +1593,36 @@ async function startServer() {
       }
     } catch (err: any) {
       console.error(`Apps Script updateRow in ${sheet} failed:`, err.message || err);
+    }
+    return false;
+  }
+
+  async function deleteRowWithAppsScript(db: LocalDB, sheet: string, keyColumnIndex: number, keyValue: string) {
+    if (!db.appsScriptUrl || db.appsScriptUrl.trim() === "") return false;
+    try {
+      const payload = {
+        action: "deleteRow",
+        spreadsheetId: db.spreadsheetId,
+        sheet: sheet,
+        keyColumnIndex: keyColumnIndex,
+        keyValue: keyValue
+      };
+      const response = await fetch(db.appsScriptUrl.trim(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        const resJson = await response.json().catch(() => null);
+        if (resJson && resJson.success === true) {
+          console.log(`Successfully deleted row(s) in ${sheet} key=${keyValue} via Apps Script Web App!`);
+          return true;
+        }
+      } else {
+        console.warn(`Apps Script deleteRow returned status ${response.status}`);
+      }
+    } catch (err: any) {
+      console.error(`Apps Script deleteRow in ${sheet} failed:`, err.message || err);
     }
     return false;
   }

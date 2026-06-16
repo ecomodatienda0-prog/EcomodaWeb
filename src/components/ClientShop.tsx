@@ -181,17 +181,18 @@ export default function ClientShop({
       {/* Selector de Navegación del Cliente */}
       <div id="client-nav-tabs" className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-4 sm:space-x-8 overflow-x-auto scrollbar-none">
+          <div className="flex space-x-4 sm:space-x-8 overflow-x-auto scrollbar-none justify-between sm:justify-start">
             <button
               onClick={() => setActiveClientTab("catalog")}
-              className={`flex items-center gap-1.5 py-2.5 sm:py-4 px-0.5 sm:px-1 border-b-2 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1 sm:gap-1.5 py-2.5 sm:py-4 px-0.5 sm:px-1 border-b-2 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
                 activeClientTab === "catalog"
                   ? "border-emerald-600 text-emerald-700"
                   : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
               <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              Catálogo de Fardos
+              <span className="hidden sm:inline">Catálogo de Fardos</span>
+              <span className="sm:hidden">Catálogo</span>
             </button>
             
             <button
@@ -200,14 +201,15 @@ export default function ClientShop({
                 setTrackedOrder(null);
                 setTrackingCodeInput("");
               }}
-              className={`flex items-center gap-1.5 py-2.5 sm:py-4 px-0.5 sm:px-1 border-b-2 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap relative ${
+              className={`flex items-center gap-1 sm:gap-1.5 py-2.5 sm:py-4 px-0.5 sm:px-1 border-b-2 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap relative ${
                 activeClientTab === "tracking"
                   ? "border-emerald-600 text-emerald-700"
                   : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
               <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              Seguimiento de Pedidos
+              <span className="hidden sm:inline">Seguimiento de Pedidos</span>
+              <span className="sm:hidden">Seguimiento Orden</span>
               <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               </span>
@@ -215,14 +217,15 @@ export default function ClientShop({
 
             <button
               onClick={() => setActiveClientTab("reviews")}
-              className={`flex items-center gap-1.5 py-2.5 sm:py-4 px-0.5 sm:px-1 border-b-2 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1 sm:gap-1.5 py-2.5 sm:py-4 px-0.5 sm:px-1 border-b-2 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
                 activeClientTab === "reviews"
                   ? "border-emerald-600 text-emerald-700"
                   : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              Reseñas ({reviews.length})
+              <span className="hidden sm:inline">Reseñas ({reviews.length})</span>
+              <span className="sm:hidden">Reseñas</span>
             </button>
           </div>
         </div>
