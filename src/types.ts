@@ -10,6 +10,8 @@ export interface CompanyInfo {
   municipio?: string;
   googleMapsLink?: string;
   logo?: string;
+  direccionExacta?: string;
+  prefijoPais?: string;
 }
 
 export interface Product {

@@ -26,6 +26,8 @@ interface CompanyInfo {
   municipio?: string;
   googleMapsLink?: string;
   logo?: string;
+  direccionExacta?: string;
+  prefijoPais?: string;
 }
 
 interface OrderItem {
@@ -273,7 +275,7 @@ async function startServer() {
   });
 
   // Update Store Configuration
-  app.post("/api/config", (req, res) => {
+  app.post("/api/config", async (req, res) => {
     const { spreadsheetId, appsScriptUrl, companyInfo } = req.body;
     const db = getDB();
 
@@ -288,7 +290,18 @@ async function startServer() {
     }
 
     saveDB(db);
-    res.json({ success: true, config: { spreadsheetId: db.spreadsheetId, appsScriptUrl: db.appsScriptUrl, companyInfo: db.companyInfo } });
+
+    let syncResult = null;
+    if (db.spreadsheetId && db.spreadsheetId.trim() !== "") {
+      try {
+        syncResult = await syncTabToGoogleSheet(db, "Datos_Empresa");
+        console.log("Synced Datos_Empresa during config save, result:", syncResult);
+      } catch (err: any) {
+        console.error("Error syncing Datos_Empresa on config save:", err.message || err);
+      }
+    }
+
+    res.json({ success: true, config: { spreadsheetId: db.spreadsheetId, appsScriptUrl: db.appsScriptUrl, companyInfo: db.companyInfo }, syncResult });
   });
 
   // Test connection to Google Apps Script
@@ -950,18 +963,37 @@ async function startServer() {
           let wroteWithAppsScript = false;
           if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
             wroteWithAppsScript = await appendWithAppsScript(db, "Resenias", values);
+            if (!wroteWithAppsScript) {
+              console.log("Failed to write to Resenias via Apps Script, trying Reseñas...");
+              wroteWithAppsScript = await appendWithAppsScript(db, "Reseñas", values);
+            }
           }
 
           if (!wroteWithAppsScript && db.googleToken && db.googleToken.accessToken) {
             const token = db.googleToken.accessToken;
             const sheets = getSheetsClient(token);
-            await sheets.spreadsheets.values.append({
-              spreadsheetId: db.spreadsheetId,
-              range: "Resenias!A:F",
-              valueInputOption: "USER_ENTERED",
-              requestBody: { values: [values] },
-            });
-            console.log(`Appended review ${newReviewId} directly to Google Sheets!`);
+            try {
+              await sheets.spreadsheets.values.append({
+                spreadsheetId: db.spreadsheetId,
+                range: "Resenias!A:F",
+                valueInputOption: "USER_ENTERED",
+                requestBody: { values: [values] },
+              });
+              console.log(`Appended review ${newReviewId} directly to Google Sheets (Resenias)!`);
+            } catch (err1) {
+              console.warn("Failed directly appending to 'Resenias', trying 'Reseñas'...", err1);
+              try {
+                await sheets.spreadsheets.values.append({
+                  spreadsheetId: db.spreadsheetId,
+                  range: "Reseñas!A:F",
+                  valueInputOption: "USER_ENTERED",
+                  requestBody: { values: [values] },
+                });
+                console.log(`Appended review ${newReviewId} directly to Google Sheets (Reseñas)!`);
+              } catch (err2) {
+                console.error("Failed directly appending to both Resenias and Reseñas:", err2);
+              }
+            }
           }
         } catch (e: any) {
           console.error("Google Sheets review append failed:", e.message || e);
@@ -1109,7 +1141,7 @@ ${JSON.stringify(catalogData, null, 2)}
         },
         {
           name: "Datos_Empresa",
-          headers: ["Nombre", "Prefijo_Pais", "Contacto", "Departamento", "Municipio", "Direccion", "Coordenadas", "Logo_Img", "Horario"]
+          headers: ["Nombre", "Prefijo_Pais", "Contacto", "Departamento", "Municipio", "Direccion_Exacta", "Coordendas_Link_Google_Maps", "Logo", "Horarios", "Cuentas_Bancarias", "URL_Apps_Script"]
         },
         {
           name: "Resenias",
@@ -1243,17 +1275,32 @@ ${JSON.stringify(catalogData, null, 2)}
         });
       });
     } else if (tabName === "Datos_Empresa") {
-      values.push(["Nombre", "Prefijo_Pais", "Contacto", "Departamento", "Municipio", "Direccion", "Coordenadas", "Logo_Img", "Horario"]);
+      values.push(["Nombre", "Prefijo_Pais", "Contacto", "Departamento", "Municipio", "Direccion_Exacta", "Coordendas_Link_Google_Maps", "Logo", "Horarios", "Cuentas_Bancarias", "URL_Apps_Script"]);
+      
+      let prefijo = db.companyInfo.prefijoPais || "+504";
+      let contacto = db.companyInfo.phone || "";
+      if (contacto.startsWith(prefijo)) {
+        contacto = contacto.slice(prefijo.length).trim();
+      } else {
+        const match = contacto.match(/^(\+\d+)\s*(.*)/);
+        if (match) {
+          prefijo = match[1];
+          contacto = match[2];
+        }
+      }
+
       values.push([
-        db.companyInfo.name,
-        "+504",
-        db.companyInfo.phone.replace(/^\+504\s*/, ""),
+        db.companyInfo.name || "",
+        prefijo,
+        contacto,
         db.companyInfo.department || "",
         db.companyInfo.municipio || "",
-        db.companyInfo.address,
+        db.companyInfo.direccionExacta || db.companyInfo.address || "",
         db.companyInfo.googleMapsLink || "",
         db.companyInfo.logo || "",
-        db.companyInfo.hours
+        db.companyInfo.hours || "",
+        db.companyInfo.bankDetails || "",
+        db.appsScriptUrl || ""
       ]);
     } else if (tabName === "Resenias") {
       values.push(["ID_Resenia", "Fecha", "Nombre", "Calificacion", "Comentario", "Producto"]);
@@ -1419,8 +1466,32 @@ ${JSON.stringify(catalogData, null, 2)}
     db.cachedProducts.push(newProd);
     db.cachedAt = Date.now();
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
-    res.json({ success: true, product: newProd, syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const rowData = [
+        newProd.id,
+        newProd.nombre,
+        newProd.precioEfectivo,
+        newProd.stock,
+        newProd.precioNormal,
+        newProd.codigoSimple || "",
+        newProd.descuento || 0,
+        newProd.fechaHasta || "",
+        newProd.cantPiezas || 0,
+        newProd.imagen || "",
+        newProd.categoria || ""
+      ];
+      const appendOk = await appendWithAppsScript(db, "Productos en Linea", rowData);
+      if (!appendOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, product: newProd, syncError });
   });
 
   app.put("/api/products/:id", async (req, res) => {
@@ -1431,8 +1502,33 @@ ${JSON.stringify(catalogData, null, 2)}
     db.cachedProducts[idx] = { ...db.cachedProducts[idx], ...req.body };
     db.cachedAt = Date.now();
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
-    res.json({ success: true, product: db.cachedProducts[idx], syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    const updatedProd = db.cachedProducts[idx];
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const rowData = [
+        updatedProd.id,
+        updatedProd.nombre,
+        updatedProd.precioEfectivo,
+        updatedProd.stock,
+        updatedProd.precioNormal,
+        updatedProd.codigoSimple || "",
+        updatedProd.descuento || 0,
+        updatedProd.fechaHasta || "",
+        updatedProd.cantPiezas || 0,
+        updatedProd.imagen || "",
+        updatedProd.categoria || ""
+      ];
+      const updateOk = await updateRowValuesWithAppsScript(db, "Productos en Linea", 0, prodId, rowData);
+      if (!updateOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, product: db.cachedProducts[idx], syncError });
   });
 
   app.delete("/api/products/:id", async (req, res) => {
@@ -1441,8 +1537,19 @@ ${JSON.stringify(catalogData, null, 2)}
     db.cachedProducts = db.cachedProducts.filter(p => p.id !== prodId);
     db.cachedAt = Date.now();
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
-    res.json({ success: true, syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const deletedOk = await deleteRowWithAppsScript(db, "Productos en Linea", 0, prodId);
+      if (!deletedOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Productos en Linea");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, syncError });
   });
 
   // USERS CRUD
@@ -1454,28 +1561,89 @@ ${JSON.stringify(catalogData, null, 2)}
     }
     db.users.push(newUser);
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
-    res.json({ success: true, user: newUser, syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const rowData = [
+        newUser.idUsuario,
+        newUser.nombre,
+        newUser.prefijoPais || "504",
+        newUser.contacto,
+        newUser.correo,
+        newUser.password,
+        newUser.foto || "",
+        newUser.rol,
+        newUser.estadoPerfil || "Activo",
+        newUser.ultimoAcceso || ""
+      ];
+      const appendOk = await appendWithAppsScript(db, "Usuarios", rowData);
+      if (!appendOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, user: newUser, syncError });
   });
 
   app.put("/api/users/:id", async (req, res) => {
     const db = getDB();
-    const userId = req.params.id;
-    const idx = db.users.findIndex(u => u.idUsuario === userId);
+    const userId = String(req.params.id || "").trim();
+    const idx = db.users.findIndex(u => String(u.idUsuario || "").trim().toLowerCase() === userId.toLowerCase());
     if (idx === -1) return res.status(404).json({ error: "Usuario no encontrado." });
     db.users[idx] = { ...db.users[idx], ...req.body };
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
-    res.json({ success: true, user: db.users[idx], syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    const updatedUser = db.users[idx];
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const rowData = [
+        updatedUser.idUsuario,
+        updatedUser.nombre,
+        updatedUser.prefijoPais || "504",
+        updatedUser.contacto,
+        updatedUser.correo,
+        updatedUser.password,
+        updatedUser.foto || "",
+        updatedUser.rol,
+        updatedUser.estadoPerfil || "Activo",
+        updatedUser.ultimoAcceso || ""
+      ];
+      const updateOk = await updateRowValuesWithAppsScript(db, "Usuarios", 0, updatedUser.idUsuario, rowData);
+      if (!updateOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, user: db.users[idx], syncError });
   });
 
   app.delete("/api/users/:id", async (req, res) => {
     const db = getDB();
-    const userId = req.params.id;
-    db.users = db.users.filter(u => u.idUsuario !== userId);
+    const userId = String(req.params.id || "").trim();
+    const userToDelete = db.users.find(u => String(u.idUsuario || "").trim().toLowerCase() === userId.toLowerCase());
+    if (!userToDelete) return res.status(404).json({ error: "Usuario no encontrado para eliminar." });
+
+    db.users = db.users.filter(u => String(u.idUsuario || "").trim().toLowerCase() !== userId.toLowerCase());
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
-    res.json({ success: true, syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const deletedOk = await deleteRowWithAppsScript(db, "Usuarios", 0, userToDelete.idUsuario);
+      if (!deletedOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Usuarios");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, syncError });
   });
 
   // REVIEWS CRUD (POST is already defined above, but we add PUT/DELETE)
@@ -1486,8 +1654,28 @@ ${JSON.stringify(catalogData, null, 2)}
     if (idx === -1) return res.status(404).json({ error: "Reseña no encontrada." });
     db.reviews[idx] = { ...db.reviews[idx], ...req.body };
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Resenias");
-    res.json({ success: true, review: db.reviews[idx], syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    const updatedRev = db.reviews[idx];
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const rowData = [
+        updatedRev.id,
+        formatLocalTimestamp(new Date(updatedRev.fecha)),
+        updatedRev.nombre,
+        updatedRev.calificacion,
+        updatedRev.comentario,
+        updatedRev.producto
+      ];
+      const updateOk = await updateRowValuesWithAppsScript(db, "Resenias", 0, rId, rowData) || await updateRowValuesWithAppsScript(db, "Reseñas", 0, rId, rowData);
+      if (!updateOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Resenias");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Resenias");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, review: db.reviews[idx], syncError });
   });
 
   app.delete("/api/reviews/:id", async (req, res) => {
@@ -1495,8 +1683,19 @@ ${JSON.stringify(catalogData, null, 2)}
     const rId = req.params.id;
     db.reviews = db.reviews.filter(r => r.id !== rId);
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Resenias");
-    res.json({ success: true, syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const deletedOk = await deleteRowWithAppsScript(db, "Resenias", 0, rId) || await deleteRowWithAppsScript(db, "Reseñas", 0, rId);
+      if (!deletedOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Resenias");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Resenias");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, syncError });
   });
 
   // CUSTOMERS CRUD
@@ -1508,8 +1707,28 @@ ${JSON.stringify(catalogData, null, 2)}
     }
     db.customers.push(newCust);
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Clientes");
-    res.json({ success: true, customer: newCust, syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const rowData = [
+        newCust.id,
+        newCust.nombre,
+        newCust.prefijoPais || "504",
+        newCust.contacto,
+        newCust.correo,
+        newCust.municipio,
+        newCust.direccionExacta
+      ];
+      const appendOk = await appendWithAppsScript(db, "Clientes", rowData);
+      if (!appendOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Clientes");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Clientes");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, customer: newCust, syncError });
   });
 
   app.put("/api/customers/:id", async (req, res) => {
@@ -1519,8 +1738,29 @@ ${JSON.stringify(catalogData, null, 2)}
     if (idx === -1) return res.status(404).json({ error: "Cliente no encontrado." });
     db.customers[idx] = { ...db.customers[idx], ...req.body };
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Clientes");
-    res.json({ success: true, customer: db.customers[idx], syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    const updatedCust = db.customers[idx];
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const rowData = [
+        updatedCust.id,
+        updatedCust.nombre,
+        updatedCust.prefijoPais || "504",
+        updatedCust.contacto,
+        updatedCust.correo,
+        updatedCust.municipio,
+        updatedCust.direccionExacta
+      ];
+      const updateOk = await updateRowValuesWithAppsScript(db, "Clientes", 0, cId, rowData);
+      if (!updateOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Clientes");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Clientes");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, customer: db.customers[idx], syncError });
   });
 
   app.delete("/api/customers/:id", async (req, res) => {
@@ -1528,8 +1768,19 @@ ${JSON.stringify(catalogData, null, 2)}
     const cId = req.params.id;
     db.customers = db.customers.filter(c => c.id !== cId);
     saveDB(db);
-    const syncRes = await syncTabToGoogleSheet(db, "Clientes");
-    res.json({ success: true, syncError: syncRes.success ? null : syncRes.error });
+
+    let syncError: string | null = null;
+    if (db.appsScriptUrl && db.appsScriptUrl.trim() !== "") {
+      const deletedOk = await deleteRowWithAppsScript(db, "Clientes", 0, cId);
+      if (!deletedOk) {
+        const syncRes = await syncTabToGoogleSheet(db, "Clientes");
+        if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+      }
+    } else {
+      const syncRes = await syncTabToGoogleSheet(db, "Clientes");
+      if (!syncRes.success) syncError = syncRes.error || "Sincronización fallida";
+    }
+    res.json({ success: true, syncError });
   });
 
   // ORDERS/SALES CRUD
@@ -1698,6 +1949,54 @@ ${JSON.stringify(catalogData, null, 2)}
     return false;
   }
 
+  async function updateRowValuesWithAppsScript(db: LocalDB, sheet: string, keyColumnIndex: number, keyValue: string, values: any[]) {
+    if (!db.appsScriptUrl || db.appsScriptUrl.trim() === "") return false;
+    const sanitizedValues = values.map(v => (v === undefined || v === null) ? "" : v);
+    try {
+      const payload = {
+        action: "updateRowValues",
+        spreadsheetId: db.spreadsheetId,
+        sheet: sheet,
+        keyColumnIndex: keyColumnIndex,
+        keyValue: keyValue,
+        values: sanitizedValues
+      };
+      const response = await fetch(db.appsScriptUrl.trim(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        const resText = await response.text().catch(() => "");
+        const isOk = resText.toLowerCase().includes('"success":true') || resText.toLowerCase().includes('"success":"true"');
+        if (isOk) {
+          console.log(`Successfully updated row values in ${sheet} key=${keyValue} via Apps Script Web App!`);
+          return true;
+        } else {
+          console.warn(`Apps Script updateRowValues response didn't indicate success: ${resText}. Trying fallback (deleteRow + append)...`);
+        }
+      } else {
+        console.warn(`Apps Script updateRowValues returned status ${response.status}. Trying fallback (deleteRow + append)...`);
+      }
+    } catch (err: any) {
+      console.error(`Apps Script updateRowValues in ${sheet} failed: ${err.message || err}. Trying fallback (deleteRow + append)...`);
+    }
+
+    // Fallback: Delete and Append
+    try {
+      console.log(`Running fallback for sheet ${sheet} key=${keyValue}: deleteRow + append`);
+      const deletedOk = await deleteRowWithAppsScript(db, sheet, keyColumnIndex, keyValue);
+      const appendOk = await appendWithAppsScript(db, sheet, sanitizedValues);
+      if (deletedOk && appendOk) {
+        console.log(`Fallback (deleteRow + append) succeeded for sheet ${sheet}!`);
+        return true;
+      }
+    } catch (fallbackErr: any) {
+      console.error(`Fallback failed for sheet ${sheet}:`, fallbackErr.message || fallbackErr);
+    }
+    return false;
+  }
+
   async function deleteRowWithAppsScript(db: LocalDB, sheet: string, keyColumnIndex: number, keyValue: string) {
     if (!db.appsScriptUrl || db.appsScriptUrl.trim() === "") return false;
     try {
@@ -1714,8 +2013,9 @@ ${JSON.stringify(catalogData, null, 2)}
         body: JSON.stringify(payload)
       });
       if (response.ok) {
-        const resJson = await response.json().catch(() => null);
-        if (resJson && resJson.success === true) {
+        const text = await response.text().catch(() => "");
+        const isSuccess = text.includes('"success":true') || text.includes("success");
+        if (isSuccess || text.length === 0) {
           console.log(`Successfully deleted row(s) in ${sheet} key=${keyValue} via Apps Script Web App!`);
           return true;
         }
@@ -1766,9 +2066,17 @@ ${JSON.stringify(catalogData, null, 2)}
             const datosEmpresa = findKeyData("Datos_Empresa") || findKeyData("Empresa");
             if (datosEmpresa && datosEmpresa.length > 1) {
               db.companyInfo = mapRowsToCompanyInfo(datosEmpresa, db.companyInfo);
+              const headersNorm = datosEmpresa[0].map((h: string) => String(h).toLowerCase().replace(/_|\s/g, ""));
+              const iScript = headersNorm.findIndex((h: string) => h.includes("url") || h.includes("appsscript") || h.includes("script"));
+              if (iScript !== -1 && datosEmpresa[1][iScript]) {
+                const scriptVal = String(datosEmpresa[1][iScript]).trim();
+                if (scriptVal && scriptVal.startsWith("http")) {
+                  db.appsScriptUrl = scriptVal;
+                }
+              }
             }
             
-            const resenias = findKeyData("Resenias") || findKeyData("Reviews");
+            const resenias = findKeyData("Resenias") || findKeyData("Reseñas") || findKeyData("Reviews");
             if (resenias && resenias.length > 1) {
               db.reviews = mapRowsToReviews(resenias);
             }
@@ -1812,7 +2120,7 @@ ${JSON.stringify(catalogData, null, 2)}
         const sheets = getSheetsClient(db.googleToken.accessToken);
         const resp = await sheets.spreadsheets.values.get({
           spreadsheetId: db.spreadsheetId,
-          range: "'Datos_Empresa'!A1:I10",
+          range: "'Datos_Empresa'!A1:Z10",
         });
         if (resp.data.values) companyRows = resp.data.values;
       } catch (err) {
@@ -1830,6 +2138,14 @@ ${JSON.stringify(catalogData, null, 2)}
     }
     if (companyRows.length > 1) {
       db.companyInfo = mapRowsToCompanyInfo(companyRows, db.companyInfo);
+      const headersNorm = companyRows[0].map((h: string) => String(h).toLowerCase().replace(/_|\s/g, ""));
+      const iScript = headersNorm.findIndex((h: string) => h.includes("url") || h.includes("appsscript") || h.includes("script"));
+      if (iScript !== -1 && companyRows[1][iScript]) {
+        const scriptVal = String(companyRows[1][iScript]).trim();
+        if (scriptVal && scriptVal.startsWith("http")) {
+          db.appsScriptUrl = scriptVal;
+        }
+      }
     }
 
     // 2. Sync Reviews (Resenias)
@@ -1843,7 +2159,17 @@ ${JSON.stringify(catalogData, null, 2)}
         });
         if (resp.data.values) reviewsRows = resp.data.values;
       } catch (err) {
-        console.warn("Error fetching Resenias via Google API", err);
+        console.warn("Error fetching Resenias via Google API, trying Reseñas...", err);
+        try {
+          const sheets = getSheetsClient(db.googleToken.accessToken);
+          const resp = await sheets.spreadsheets.values.get({
+            spreadsheetId: db.spreadsheetId,
+            range: "'Reseñas'!A1:F500",
+          });
+          if (resp.data.values) reviewsRows = resp.data.values;
+        } catch (err2) {
+          console.warn("Error fetching Reseñas via Google API fallback", err2);
+        }
       }
     }
     if (reviewsRows.length === 0) {
@@ -1852,7 +2178,14 @@ ${JSON.stringify(catalogData, null, 2)}
         const text = await fetch(url).then(r => r.text());
         reviewsRows = parseCSV(text);
       } catch (err) {
-        console.warn("Error fetching Resenias via CSV export", err);
+        console.warn("Error fetching Resenias via CSV export, trying Reseñas...", err);
+        try {
+          const url = `https://docs.google.com/spreadsheets/d/${db.spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent("Reseñas")}`;
+          const text = await fetch(url).then(r => r.text());
+          reviewsRows = parseCSV(text);
+        } catch (err2) {
+          console.warn("Error fetching Reseñas via CSV export fallback", err2);
+        }
       }
     }
     if (reviewsRows.length > 1) {
@@ -2079,9 +2412,11 @@ ${JSON.stringify(catalogData, null, 2)}
     const iDept = headers.findIndex(h => h.includes("departamento"));
     const iMunicipio = headers.findIndex(h => h.includes("municipio"));
     const iAddress = headers.findIndex(h => h.includes("direccion") || h.includes("dirección"));
-    const iMaps = headers.findIndex(h => h.includes("coorden") || h.includes("maps") || h.includes("link"));
+    const iMaps = headers.findIndex(h => h.includes("coorden") || h.includes("coordendas") || h.includes("coord") || h.includes("maps") || h.includes("link") || h.includes("google"));
     const iLogo = headers.findIndex(h => h.includes("logo") || h.includes("logo_img"));
-    const iHours = headers.findIndex(h => h.includes("horario") || h.includes("horas"));
+    const iHours = headers.findIndex(h => h.includes("horario") || h.includes("horas") || h.includes("horarios"));
+    const iBank = headers.findIndex(h => h.includes("banc") || h.includes("cuentas") || h.includes("bank") || h.includes("cuentasbancarias"));
+    const iScript = headers.findIndex(h => h.includes("url") || h.includes("appsscript") || h.includes("script"));
 
     const row = rows[1];
     if (!row) return fallback;
@@ -2090,15 +2425,28 @@ ${JSON.stringify(catalogData, null, 2)}
     const phoneNumRaw = iPhone !== -1 && row[iPhone] !== undefined && row[iPhone] !== null ? String(row[iPhone]).trim() : "9547-1667";
     const cleanPhone = phoneNumRaw.startsWith("+") ? phoneNumRaw : `${prefix} ${phoneNumRaw}`;
 
+    // Concatenate physical address: Departamento, Municipio, Direccion_Exacta/Direccion
+    const deptStr = iDept !== -1 && row[iDept] !== undefined && row[iDept] !== null ? String(row[iDept]).trim() : "";
+    const muniStr = iMunicipio !== -1 && row[iMunicipio] !== undefined && row[iMunicipio] !== null ? String(row[iMunicipio]).trim() : "";
+    
+    const iAddressExact = headers.findIndex(h => h.includes("direccionexacta") || h.includes("direcciónexacta") || h.includes("direccion_exacta") || h.includes("direccionexact"));
+    const finalAddressIdx = iAddressExact !== -1 ? iAddressExact : iAddress;
+    const exactStr = finalAddressIdx !== -1 && row[finalAddressIdx] !== undefined && row[finalAddressIdx] !== null ? String(row[finalAddressIdx]).trim() : "";
+
+    const addressParts = [deptStr, muniStr, exactStr].filter(p => p !== "");
+    const concatenatedAddress = addressParts.length > 0 ? addressParts.join(", ") : fallback.address;
+
     return {
       name: iName !== -1 && row[iName] !== undefined && row[iName] !== null ? String(row[iName]).trim() : fallback.name,
       phone: cleanPhone,
-      address: iAddress !== -1 && row[iAddress] !== undefined && row[iAddress] !== null ? String(row[iAddress]).trim() : fallback.address,
+      prefijoPais: prefix,
+      address: concatenatedAddress,
       hours: iHours !== -1 && row[iHours] !== undefined && row[iHours] !== null ? String(row[iHours]).trim() : fallback.hours,
-      bankDetails: fallback.bankDetails,
+      bankDetails: iBank !== -1 && row[iBank] !== undefined && row[iBank] !== null ? String(row[iBank]).trim() : fallback.bankDetails,
       cashDiscountPercent: fallback.cashDiscountPercent,
-      department: iDept !== -1 && row[iDept] !== undefined && row[iDept] !== null ? String(row[iDept]).trim() : fallback.department,
-      municipio: iMunicipio !== -1 && row[iMunicipio] !== undefined && row[iMunicipio] !== null ? String(row[iMunicipio]).trim() : fallback.municipio,
+      department: deptStr || fallback.department,
+      municipio: muniStr || fallback.municipio,
+      direccionExacta: exactStr || fallback.direccionExacta,
       googleMapsLink: iMaps !== -1 && row[iMaps] !== undefined && row[iMaps] !== null ? String(row[iMaps]).trim() : fallback.googleMapsLink,
       logo: iLogo !== -1 && row[iLogo] !== undefined && row[iLogo] !== null ? String(row[iLogo]).trim() : fallback.logo,
     };
@@ -2171,13 +2519,16 @@ ${JSON.stringify(catalogData, null, 2)}
     const iEstado = headers.findIndex(h => h.includes("estadoperfil") || h.includes("estado"));
     const iUltimo = headers.findIndex(h => h.includes("ultimoacceso") || h.includes("ultimo"));
 
-    const list: User[] = [];
+    const userMap = new Map<string, User>();
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row.length < 2) continue;
 
-      list.push({
-        idUsuario: iId !== -1 && row[iId] !== undefined && row[iId] !== null ? String(row[iId]).trim() : `USR-${i}`,
+      const idUsuario = iId !== -1 && row[iId] !== undefined && row[iId] !== null ? String(row[iId]).trim() : `USR-${i}`;
+      const cleanId = idUsuario.toLowerCase();
+
+      userMap.set(cleanId, {
+        idUsuario: idUsuario,
         nombre: iName !== -1 && row[iName] !== undefined && row[iName] !== null ? String(row[iName]).trim() : `Usuario ${i}`,
         prefijoPais: iPrefix !== -1 && row[iPrefix] !== undefined && row[iPrefix] !== null ? String(row[iPrefix]).trim() : "+504",
         contacto: iContact !== -1 && row[iContact] !== undefined && row[iContact] !== null ? String(row[iContact]).trim() : "",
@@ -2189,7 +2540,7 @@ ${JSON.stringify(catalogData, null, 2)}
         ultimoAcceso: iUltimo !== -1 && row[iUltimo] !== undefined && row[iUltimo] !== null ? String(row[iUltimo]).trim() : "",
       });
     }
-    return list;
+    return Array.from(userMap.values());
   }
 
   if (process.env.NODE_ENV !== "production") {

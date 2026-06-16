@@ -110,6 +110,7 @@ export default function ClientShop({
   const [reviewComment, setReviewComment] = useState("");
   const [reviewProduct, setReviewProduct] = useState("General");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
 
    const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todas");
@@ -287,24 +288,23 @@ export default function ClientShop({
       {/* Brand Hero Cover */}
       <div className="relative bg-gradient-to-r from-teal-900 to-emerald-800 text-white overflow-hidden shadow-md">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-4 flex flex-col md:flex-row md:items-center md:justify-between relative z-10">
+        <div className="max-w-7xl mx-auto px-2 py-1.5 sm:px-6 lg:px-8 sm:py-4 flex flex-col md:flex-row md:items-center md:justify-between relative z-10">
           <div>
-            <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight font-sans">
+            <h1 className="text-lg sm:text-3xl font-extrabold tracking-tight font-sans">
               {companyInfo.name}
             </h1>
-            <p className="mt-0.5 sm:mt-1.5 text-emerald-100 max-w-xl text-xs sm:text-sm font-semibold">
+            <p className="text-emerald-100 max-w-xl text-[10px] sm:text-sm font-semibold">
               Calidad Garantizada - Entregas Locales Comayagua Gratis
             </p>
           </div>
 
-          <div className="mt-2.5 md:mt-0 flex gap-1.5 sm:gap-2.5 flex-wrap">
+          <div className="mt-1.5 md:mt-0 flex gap-1 sm:gap-2.5 flex-wrap">
             <button
               onClick={() => setIsAiAssistantOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-linear-to-r from-teal-550 via-emerald-500 to-lime-500 hover:brightness-110 text-white font-black text-xs sm:text-sm transition-all border border-white/10 cursor-pointer shadow-md shadow-emerald-950/25 active:scale-95 animate-pulse"
-              style={{ animationDuration: "3s" }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-lg sm:rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-950/20 transition-all cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200 shrink-0" />
-              Asesor de Compras AI
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              Asesor Virtual
             </button>
             <button
               onClick={() => setShowInfo(!showInfo)}
@@ -410,9 +410,44 @@ export default function ClientShop({
               <div className="p-6 space-y-5">
                 <div className="flex gap-3">
                   <MapPin className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-slate-900 text-sm">Dirección Física</h4>
-                    <p className="text-slate-600 text-sm mt-0.5">{companyInfo.address}</p>
+                    <p className="text-slate-600 text-sm mt-0.5 whitespace-pre-line leading-relaxed">
+                      {companyInfo.address}
+                    </p>
+
+                    {companyInfo.googleMapsLink && companyInfo.googleMapsLink.trim() !== "" && (
+                      <div className="mt-3.5 space-y-2">
+                        <div className="rounded-xl overflow-hidden border border-slate-200 shadow-xs h-40 bg-slate-50 relative">
+                          <iframe
+                            title="Ubicación de la Empresa"
+                            width="100%"
+                            height="100%"
+                            style={{ border: 0 }}
+                            loading="lazy"
+                            allowFullScreen
+                            referrerPolicy="no-referrer-when-downgrade"
+                            src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                              companyInfo.googleMapsLink.trim().replace(/[\s"']/g, "")
+                            )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                          />
+                        </div>
+                        <a
+                          href={
+                            companyInfo.googleMapsLink.startsWith("http")
+                              ? companyInfo.googleMapsLink
+                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                  companyInfo.googleMapsLink.trim().replace(/[\s"']/g, "")
+                                )}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition-all cursor-pointer"
+                        >
+                          <span>🗺️ Ver ubicación en Google Maps</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -696,25 +731,26 @@ export default function ClientShop({
 
         {/* TAB 2: REAL-TIME TRACKING */}
         {activeClientTab === "tracking" && (
-          <div className="space-y-6 max-w-3xl mx-auto">
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 text-center space-y-4">
-              <div className="size-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-emerald-600">
-                <Truck className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg text-slate-900">Seguimiento de tu fardo</h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Introduce el código de orden generado durante la compra (por ejemplo, <strong>ORDEN001</strong>) para conocer su estado de preparación y envío en tiempo real.
-                </p>
+          <div className="space-y-4 max-w-2xl mx-auto animate-fade-in">
+            {/* Search Box - Ultra-compact layout */}
+            <div className="bg-white rounded-xl border border-slate-100 shadow-xs p-3 flex flex-col sm:flex-row items-center gap-3 justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-1.5 bg-emerald-50 rounded-lg shrink-0">
+                  <Truck className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-xs sm:text-sm text-slate-900 leading-none">Seguimiento de Orden</h3>
+                  <p className="text-[9px] text-slate-400 mt-1">Ingresa tu código para ver el estado de preparación y envío</p>
+                </div>
               </div>
 
-              <div className="flex gap-2 max-w-md mx-auto pt-2">
+              <div className="flex gap-1.5 w-full sm:w-auto max-w-xs shrink-0">
                 <input
                   type="text"
                   value={trackingCodeInput}
                   onChange={(e) => setTrackingCodeInput(e.target.value)}
                   placeholder="Ej: ORDEN001"
-                  className="flex-1 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-hidden font-bold uppercase"
+                  className="w-full sm:w-32 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-lg px-2.5 py-1 text-xs font-mono focus:outline-hidden font-bold uppercase"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       const found = orders.find(o => o.id.trim().toUpperCase() === trackingCodeInput.trim().toUpperCase());
@@ -728,56 +764,43 @@ export default function ClientShop({
                     const found = orders.find(o => o.id.trim().toUpperCase() === trackingCodeInput.trim().toUpperCase());
                     setTrackedOrder(found || "notfound");
                   }}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] sm:text-xs px-3.5 py-1 rounded-lg transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                 >
                   Buscar
                 </button>
               </div>
             </div>
 
-            {/* Tracking detail block */}
+            {/* Tracking detail block - Sleek & Compact */}
             {trackedOrder && trackedOrder !== "notfound" && (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-3xl border border-slate-100 shadow-md overflow-hidden"
+                className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"
               >
-                {/* Header card */}
-                <div className="bg-slate-900 p-6 text-white flex flex-wrap justify-between items-center gap-4">
+                {/* Header bar */}
+                <div className="bg-slate-900 px-4 py-2.5 text-white flex justify-between items-center gap-2">
                   <div>
-                    <span className="text-[10px] text-emerald-300 font-extrabold uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">LIVE: EN TIEMPO REAL</span>
-                    <h4 className="text-lg font-black font-mono mt-1">Pedido #{trackedOrder.id}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">Fecha: {new Date(trackedOrder.fecha).toLocaleDateString("es-HN", { hour: "numeric", minute: "numeric" })}</p>
+                    <span className="text-[8px] sm:text-[9px] text-emerald-300 font-extrabold uppercase tracking-wider bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/20">Sincronizado</span>
+                    <h4 className="text-xs sm:text-sm font-black font-mono leading-none mt-1">Orden #{trackedOrder.id}</h4>
                   </div>
                   <div>
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider ${
-                      trackedOrder.status === "Completado" 
-                        ? "bg-emerald-500/25 text-emerald-300" 
-                        : trackedOrder.status === "Enviado"
-                        ? "bg-blue-500/25 text-blue-300"
-                        : trackedOrder.status === "Confirmado"
-                        ? "bg-amber-500/25 text-amber-300"
-                        : trackedOrder.status === "Cancelado"
-                        ? "bg-rose-500/25 text-rose-300"
-                        : "bg-slate-700 text-slate-300"
-                    }`}>
-                      <Package className="w-3.5 h-3.5" />
-                      {trackedOrder.status}
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/10 text-[10px] font-extrabold uppercase tracking-wide`}>
+                      <Package className="w-3 h-3 text-emerald-400 fill-emerald-400/20" />
+                      <span>{trackedOrder.status}</span>
                     </span>
                   </div>
                 </div>
 
-                {/* Progress Stepper bar */}
-                <div className="p-6 border-b border-slate-100">
-                  <h5 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-6">Progreso del Pedido</h5>
-                  
-                  <div className="relative flex items-center justify-between">
-                    {/* Background track line */}
-                    <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 bg-slate-100 -z-0"></div>
+                {/* Progress Stepper - Compacter rendering */}
+                <div className="p-3 border-b border-slate-100">
+                  <div className="relative flex items-center justify-between px-2">
+                    {/* Background line */}
+                    <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 -z-0"></div>
                     
-                    {/* Colored track progress */}
+                    {/* Progress fill line */}
                     <div 
-                      className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-emerald-500 -z-0 transition-all duration-550"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 h-0.5 bg-emerald-500 -z-0 transition-all duration-550"
                       style={{
                         width: 
                           trackedOrder.status === "Pendiente" ? "0%" :
@@ -787,91 +810,85 @@ export default function ClientShop({
                       }}
                     ></div>
 
-                    {/* Stepper Node 1 */}
+                    {/* Node 1 */}
                     <div className="flex flex-col items-center relative z-10">
-                      <div className="size-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shadow-md">1</div>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-800 mt-2">Registrado</span>
+                      <div className="size-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-bold shadow-xs">1</div>
+                      <span className="text-[9px] font-bold text-slate-800 mt-1">Registrado</span>
                     </div>
 
-                    {/* Stepper Node 2 */}
+                    {/* Node 2 */}
                     <div className="flex flex-col items-center relative z-10">
-                      <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
+                      <div className={`size-5 rounded-full flex items-center justify-center text-[9px] font-bold transition-all shadow-xs ${
                         ["Confirmado", "Enviado", "Completado"].includes(trackedOrder.status)
-                          ? "bg-emerald-600 text-white shadow-md"
+                          ? "bg-emerald-600 text-white"
                           : "bg-slate-200 text-slate-500"
                       }`}>2</div>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-800 mt-2">Preparado</span>
+                      <span className="text-[9px] font-bold text-slate-600 mt-1">Preparado</span>
                     </div>
 
-                    {/* Stepper Node 3 */}
+                    {/* Node 3 */}
                     <div className="flex flex-col items-center relative z-10">
-                      <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
+                      <div className={`size-5 rounded-full flex items-center justify-center text-[9px] font-bold transition-all shadow-xs ${
                         ["Enviado", "Completado"].includes(trackedOrder.status)
-                          ? "bg-emerald-600 text-white shadow-md"
+                          ? "bg-emerald-600 text-white"
                           : "bg-slate-200 text-slate-500"
                       }`}>3</div>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-800 mt-2">Despachado</span>
+                      <span className="text-[9px] font-bold text-slate-600 mt-1">Despachado</span>
                     </div>
 
-                    {/* Stepper Node 4 */}
+                    {/* Node 4 */}
                     <div className="flex flex-col items-center relative z-10">
-                      <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
+                      <div className={`size-5 rounded-full flex items-center justify-center text-[9px] font-bold transition-all shadow-xs ${
                         trackedOrder.status === "Completado"
-                          ? "bg-emerald-500 text-white shadow-md"
+                          ? "bg-emerald-500 text-white"
                           : "bg-slate-200 text-slate-500"
                       }`}>4</div>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-800 mt-2">Recibido</span>
+                      <span className="text-[9px] font-bold text-slate-600 mt-1">Recibido</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Tracking information info log list */}
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-slate-100 bg-slate-50/50">
-                  <div className="space-y-3">
-                    <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Detalles de Entrega</h5>
-                    <div className="text-xs text-slate-600 space-y-1.5">
-                      <p><strong>Destinatario:</strong> {trackedOrder.clienteNombre}</p>
-                      <p><strong>Teléfono:</strong> {trackedOrder.clienteTelefono}</p>
-                      <p><strong>Municipio / Región:</strong> {trackedOrder.municipio || "Honduras"}</p>
-                      <p><strong>Dirección:</strong> {trackedOrder.clienteDireccion}</p>
-                      {trackedOrder.clienteNotas && (
-                        <p className="bg-amber-50 text-amber-800 border border-amber-100 p-2.5 rounded-xl text-[11px] mt-2 italic">
-                          "Notas: {trackedOrder.clienteNotas}"
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Pago y Envío</h5>
-                    <div className="text-xs text-slate-600 space-y-1.5">
-                      <p><strong>Forma de Pago:</strong> {trackedOrder.paymentMethod}</p>
-                      <p><strong>Precio Regular:</strong> L. {trackedOrder.totalNormal.toLocaleString()}</p>
-                      <p><strong>Descuento Aplicado:</strong> L. {trackedOrder.totalDescuento.toLocaleString()}</p>
-                      <p className="text-emerald-700 bg-emerald-50/70 py-1.5 px-3 rounded-lg border border-emerald-100 inline-block">
-                        <strong>Monto Final Pagado:</strong> <span className="font-extrabold text-sm">L. {trackedOrder.totalEfectivo.toLocaleString()}</span>
+                {/* Grid details simplified */}
+                <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50/50 text-[11px] leading-tight text-slate-600">
+                  <div className="space-y-1.5">
+                    <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Detalles de Entrega</h5>
+                    <p><strong>Destinatario:</strong> {trackedOrder.clienteNombre}</p>
+                    <p><strong>Teléfono:</strong> {trackedOrder.clienteTelefono}</p>
+                    <p className="truncate"><strong>Dirección:</strong> {trackedOrder.clienteDireccion} ({trackedOrder.municipio || "Honduras"})</p>
+                    {trackedOrder.clienteNotas && (
+                      <p className="bg-amber-50 text-amber-805 text-amber-900 border border-amber-100 p-1.5 rounded-lg text-[10px] italic">
+                        "Notas: {trackedOrder.clienteNotas}"
                       </p>
-                    </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5 border-t md:border-t-0 md:border-l border-slate-100 pt-2 md:pt-0 md:pl-3">
+                    <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Monto & Pago</h5>
+                    <p><strong>Forma de Pago:</strong> {trackedOrder.paymentMethod}</p>
+                    <p><strong>Descuento:</strong> L. {trackedOrder.totalDescuento.toLocaleString()}</p>
+                    <p className="text-emerald-800 font-bold bg-emerald-50 py-1 px-2 rounded-md border border-emerald-100/60 inline-block leading-none mt-1">
+                      Monto Pagado: <span className="font-extrabold text-xs">L. {trackedOrder.totalEfectivo.toLocaleString()}</span>
+                    </p>
                   </div>
                 </div>
 
-                {/* Items listing */}
-                <div className="p-6 space-y-3.5">
-                  <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Fardos / Prendas de esta Orden</h5>
-                  <div className="space-y-3">
+                {/* Items Mini Scroll Area */}
+                <div className="p-3 bg-white space-y-2">
+                  <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Prendas / Fardos en la Orden</h5>
+                  <div className="max-h-32 overflow-y-auto space-y-1.5">
                     {trackedOrder.items.map((item) => (
-                      <div key={item.id} className="flex items-center gap-3 bg-white p-3 border border-slate-100 rounded-xl">
+                      <div key={item.id} className="flex items-center gap-2 bg-slate-50 border border-slate-100 p-1.5 rounded-lg">
                         {!item.imagen || 
                          item.imagen.trim() === "" || 
                          item.imagen.includes("photo-1523381210434-271e8be1f52b") || 
                          imageErrors[item.id] ? (
-                          <div className="size-11 shrink-0 overflow-hidden rounded-lg">
+                          <div className="size-8 shrink-0 overflow-hidden rounded">
                             <ProductImageFallback id={item.id} size="xs" />
                           </div>
                         ) : (
                           <img 
                             src={item.imagen} 
-                            className="size-11 object-cover rounded-lg shrink-0" 
+                            className="size-8 object-cover rounded shrink-0" 
                             alt={item.nombre}
                             onError={() => {
                               setImageErrors(prev => ({ ...prev, [item.id]: true }));
@@ -879,9 +896,9 @@ export default function ClientShop({
                           />
                         )}
                         <div className="flex-1 min-w-0">
-                          <h6 className="font-bold text-slate-800 text-xs truncate">{item.nombre}</h6>
-                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono font-bold mt-0.5">
-                            <span>COD: {item.id} • Categoría: {item.categoria}</span>
+                          <h6 className="font-bold text-slate-800 text-[11px] truncate leading-none">{item.nombre}</h6>
+                          <div className="flex justify-between items-center text-[9px] text-slate-400 font-mono font-bold mt-1">
+                            <span>COD: {item.id}</span>
                             <span>Cant: {item.cantidad}</span>
                           </div>
                         </div>
@@ -890,16 +907,16 @@ export default function ClientShop({
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 text-center border-t border-slate-100">
-                  <p className="text-[10px] text-slate-400">Si requieres asistencia inmediata o deseas modificar tu fardo, contáctanos indicando el ID de orden.</p>
+                <div className="p-2 bg-slate-100/50 text-center border-t border-slate-100">
+                  <p className="text-[9px] text-slate-400 font-medium">Asistencia inmediata indicando tu ID de orden.</p>
                 </div>
               </motion.div>
             )}
 
             {trackedOrder === "notfound" && (
-              <div className="bg-amber-50/50 border border-amber-200 rounded-3xl p-6 text-center space-y-2">
-                <p className="text-sm text-amber-700 font-bold">⚠️ Código de pedido no encontrado</p>
-                <p className="text-xs text-slate-500">Verifica que esté escrito exactamente como se te asignó al finalizar tu compra (ej: ORDEN001).</p>
+              <div className="bg-amber-50/55 border border-amber-200 rounded-xl p-2.5 text-center space-y-1">
+                <p className="text-xs text-amber-700 font-bold">⚠️ Código no encontrado</p>
+                <p className="text-[10px] text-slate-500">Asegúrate de copiar tu código de compra exactamente como fue asignado.</p>
               </div>
             )}
           </div>
@@ -907,16 +924,112 @@ export default function ClientShop({
 
         {/* TAB 3: CLIENT REVIEWS */}
         {activeClientTab === "reviews" && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-              
-              {/* Form panel card */}
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm">Déjanos tu opinión</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">Tu feedback es sumamente valioso para ayudar a la comunidad.</p>
+          <div className="space-y-4 animate-fade-in">
+            {/* Header with Average and Open review button - Ultra-compacted to maximize space */}
+            <div className="flex flex-row items-center justify-between gap-2 py-1 px-1 border-b border-slate-200/60 pb-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="p-1 bg-emerald-50 rounded-md shrink-0">
+                  <Star className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="font-extrabold text-slate-950 text-xs sm:text-sm leading-tight truncate">Opiniones ({reviews.length})</h4>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="bg-amber-50 rounded-md py-0.5 px-1.5 border border-amber-200/50 flex items-center gap-1 shrink-0">
+                  <Star className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
+                  <span className="font-extrabold text-[10px] text-amber-800 leading-none">
+                    {(reviews.reduce((sum, r) => sum + r.calificacion, 0) / (reviews.length || 1)).toFixed(1)}
+                  </span>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => setIsReviewFormOpen(true)}
+                  className="inline-flex items-center gap-1 py-1 px-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-white font-extrabold text-[10px] sm:text-xs shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
+                >
+                  <MessageSquare className="w-2.5 h-2.5 text-emerald-400 fill-emerald-400/20" />
+                  <span>Dejar Reseña</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Compact Reviews Feed */}
+            {reviews.length === 0 ? (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl py-10 text-center text-slate-500">
+                <MessageSquare className="w-7 h-7 mx-auto text-slate-300 mb-2" />
+                <p className="text-[11px] font-bold">Sé el primero en compartir tu opinión</p>
+                <p className="text-[9px] text-slate-400 mt-0.5">Toca el botón "Dejar Reseña" de arriba para comenzar.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {reviews.map((rev) => (
+                  <div key={rev.id} className="bg-white border border-slate-100 shadow-2xs p-3.5 rounded-2xl flex flex-col justify-between hover:border-slate-200 transition-all">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-slate-850 truncate max-w-[130px]" title={rev.nombre}>{rev.nombre}</span>
+                        <span className="text-[9px] text-slate-400 font-mono font-bold">{rev.fecha ? rev.fecha.substring(0, 10) : ""}</span>
+                      </div>
+                      
+                      <div className="flex gap-0.5">
+                        {Array.from({ length: 5 }).map((_, starIdx) => (
+                          <Star 
+                            key={starIdx} 
+                            className={`w-3 h-3 ${starIdx < rev.calificacion ? "text-amber-400 fill-amber-400" : "text-slate-200"}`} 
+                          />
+                        ))}
+                      </div>
+
+                      <p className="text-slate-600 text-[10.5px] italic leading-snug font-sans break-words font-medium">"{rev.comentario}"</p>
+                    </div>
+
+                    {rev.producto && rev.producto !== "General" && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-50 text-[9px] font-bold text-emerald-700 flex items-center gap-1">
+                        <Package className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                        <span className="truncate">Ref: {rev.producto}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      {/* Leave Review Modal Popup Overlay */}
+      <AnimatePresence>
+        {isReviewFormOpen && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsReviewFormOpen(false)}
+              className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs"
+            />
+            
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 30 }}
+              className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden relative z-10 border border-slate-100 flex flex-col max-h-[90vh]"
+            >
+              <div className="bg-slate-900 px-4 py-3 text-white flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
+                  <span className="font-extrabold text-[11px] sm:text-xs font-sans uppercase tracking-wider">Escribe tu Opinión, Ayuda a otros</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsReviewFormOpen(false)}
+                  className="p-1 hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-white text-base font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="p-4 overflow-y-auto space-y-4">
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   if (!reviewName.trim() || !reviewComment.trim()) return;
@@ -929,29 +1042,29 @@ export default function ClientShop({
                   });
                   setIsSubmittingReview(false);
                   if (success) {
-                    alert("¡Gracias! Tu reseña ha sido guardada y sincronizada directamente con Google Sheets.");
+                    setIsReviewFormOpen(false);
                     setReviewName("");
                     setReviewComment("");
                     setReviewProduct("General");
                   } else {
                     alert("Ocurrió un error al guardar tu opinión.");
                   }
-                }} className="space-y-3.5">
+                }} className="space-y-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Tu Nombre *</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tu Nombre *</label>
                     <input 
                       type="text" 
                       required 
                       value={reviewName}
                       onChange={(e) => setReviewName(e.target.value)}
                       placeholder="Ej: Sofía Martínez"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-xl py-2 px-3 text-xs focus:outline-hidden"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-xl py-2 px-3 text-xs focus:outline-hidden text-slate-800"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Calificación *</label>
-                    <div className="flex gap-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Calificación *</label>
+                    <div className="flex gap-1.5">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
@@ -966,11 +1079,11 @@ export default function ClientShop({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Fardo / Prenda Comprada</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Prenda / Fardo Comprado</label>
                     <select
                       value={reviewProduct}
                       onChange={(e) => setReviewProduct(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 rounded-xl py-2 px-2.5 text-xs focus:outline-hidden cursor-pointer"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 rounded-xl py-2 px-2 text-xs focus:outline-hidden cursor-pointer text-slate-700"
                     >
                       <option value="General">Opinión General / Tienda</option>
                       {products.map(p => (
@@ -980,84 +1093,40 @@ export default function ClientShop({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Tu Mensaje *</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tu Mensaje *</label>
                     <textarea
                       required
                       rows={3}
                       value={reviewComment}
                       onChange={(e) => setReviewComment(e.target.value)}
-                      placeholder="Cuéntanos más acerca del estado del fardo, envío o atención..."
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-xl py-2 px-3 text-xs focus:outline-hidden font-sans"
+                      placeholder="Cuéntanos acerca del estado del fardo, envío o atención..."
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-xl py-2 px-3 text-xs focus:outline-hidden text-slate-800 font-sans"
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={isSubmittingReview}
-                    className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
-                  >
-                    {isSubmittingReview ? "Enviando..." : "Sincronizar Reseña"}
-                  </button>
+                  <div className="pt-2 flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      disabled={isSubmittingReview}
+                      onClick={() => setIsReviewFormOpen(false)}
+                      className="py-1.5 px-3.5 bg-slate-105 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingReview}
+                      className="py-1.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center"
+                    >
+                      {isSubmittingReview ? "Publicando..." : "Publicar"}
+                    </button>
+                  </div>
                 </form>
               </div>
-
-              {/* Reviews Feed panel */}
-              <div className="md:col-span-2 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm">Opiniones de Compradores</h4>
-                    <p className="text-xs text-slate-500">Historial de clientes satisfechos que han comprado fardos.</p>
-                  </div>
-                  <div className="text-right sm:text-left bg-emerald-50 rounded-2xl py-2 px-4 border border-emerald-100 flex items-center gap-2">
-                    <Star className="w-4 h-4 text-emerald-600 fill-emerald-600" />
-                    <span className="font-extrabold text-sm text-emerald-800">
-                      {(reviews.reduce((sum, r) => sum + r.calificacion, 0) / (reviews.length || 1)).toFixed(1)} / 5.0
-                    </span>
-                  </div>
-                </div>
-
-                {reviews.length === 0 ? (
-                  <div className="bg-slate-50 border border-slate-200 rounded-3xl py-12 text-center text-slate-500">
-                    <MessageSquare className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                    <p className="text-xs font-bold">Sé el primero en compartir tu opinión</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Escribe tu reseña en el formulario lateral.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4">
-                    {reviews.map((rev) => (
-                      <div key={rev.id} className="bg-white border border-slate-100 shadow-xs p-5 rounded-3xl flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-black text-slate-800 font-sans">{rev.nombre}</span>
-                            <span className="text-[9px] text-slate-400 font-mono">{rev.fecha.substring(0, 10)}</span>
-                          </div>
-                          
-                          <div className="flex gap-0.5 mb-2.5">
-                            {Array.from({ length: 5 }).map((_, starIdx) => (
-                              <Star 
-                                key={starIdx} 
-                                className={`w-3.5 h-3.5 ${starIdx < rev.calificacion ? "text-amber-400 fill-amber-400" : "text-slate-150 text-slate-200"}`} 
-                              />
-                            ))}
-                          </div>
-
-                          <p className="text-slate-600 text-xs italic leading-relaxed font-sans mt-1">"{rev.comentario}"</p>
-                        </div>
-
-                        {rev.producto && (
-                          <div className="mt-3 pt-2.5 border-t border-slate-50 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                            <Package className="w-3 h-3 text-emerald-600 shrink-0" />
-                            <span>Referencia: {rev.producto}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            </motion.div>
           </div>
         )}
+      </AnimatePresence>
       </div>
 
       {/* Product Zoom Modal Drawer */}
@@ -1219,10 +1288,10 @@ export default function ClientShop({
         )}
       </AnimatePresence>
 
-      {/* AI Shopper Assistant Modal */}
+      {/* Shopper Assistant Modal */}
       <AnimatePresence>
         {isAiAssistantOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1236,16 +1305,16 @@ export default function ClientShop({
               initial={{ scale: 0.95, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 30 }}
-              className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden relative z-10 border border-slate-100 flex flex-col max-h-[92vh]"
+              className="bg-white w-full max-w-3xl rounded-t-2xl sm:rounded-3xl shadow-2xl overflow-hidden relative z-10 border border-slate-150 flex flex-col h-[94vh] sm:h-auto max-h-[94vh] sm:max-h-[92vh]"
             >
               {/* Header */}
-              <div className="bg-gradient-to-r from-teal-900 via-emerald-800 to-lime-800 p-5 sm:p-6 text-white flex justify-between items-center shrink-0">
+              <div className="bg-gradient-to-r from-teal-900 via-emerald-800 to-lime-800 p-3.5 sm:p-5 sm:p-6 text-white flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 bg-white/10 rounded-xl">
                     <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
                   </div>
                   <div>
-                    <h3 className="font-black text-sm sm:text-base leading-tight">Asesor Personal de Compras AI</h3>
+                    <h3 className="font-black text-sm sm:text-base leading-tight">Asesor Virtual</h3>
                     <p className="text-[10px] text-emerald-100/95 mt-0.5 font-medium">EcoModa calcula y te arma el fardo ideal para tu presupuesto</p>
                   </div>
                 </div>
@@ -1260,12 +1329,12 @@ export default function ClientShop({
               </div>
 
               {/* Modal Body */}
-              <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+              <div className="p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1 text-xs">
                 
                 {/* Solicitud Box */}
                 <div className="space-y-2">
-                  <label className="block font-black text-slate-700 uppercase tracking-wider text-[10px]">
-                    Explícale tu presupuesto y público objetivo a la IA:
+                  <label className="block font-black text-slate-700 uppercase tracking-wider text-[9px] sm:text-[10px]">
+                    Explícale tu presupuesto y público objetivo al Asesor Virtual:
                   </label>
                   <div className="relative border border-slate-200 focus-within:border-emerald-500 rounded-2xl p-2.5 bg-slate-50 focus-within:bg-white transition-all">
                     <textarea
@@ -1289,7 +1358,7 @@ export default function ClientShop({
                           title="Hacer dictado por voz"
                         >
                           <Mic className={`w-3.5 h-3.5 ${isListening ? "animate-pulse" : ""}`} />
-                          {isListening ? "¡Escuchando voz...!" : "🎙️ Tocar para Hablar"}
+                          {isListening ? "¡Escuchando voz...!" : "Tocar para Hablar"}
                         </button>
                         
                         {isListening && (
@@ -1317,9 +1386,9 @@ export default function ClientShop({
                       <div className="w-12 h-12 rounded-full border-4 border-emerald-150 border-t-emerald-600 animate-spin"></div>
                       <Sparkles className="w-5 h-5 text-amber-500 animate-ping absolute" />
                     </div>
-                    <p className="font-extrabold text-slate-800 text-sm">Procesando sugerencias con Inteligencia Artificial...</p>
+                    <p className="font-extrabold text-slate-800 text-sm">Procesando tus sugerencias del Asesor Virtual...</p>
                     <p className="text-[10px] text-slate-400 max-w-sm mx-auto">
-                      EcoModa AI está simulando la suma de precios, comprobando la existencia de los fardos y seleccionando el mejor surtido exclusivo para tu negocio.
+                      El asesor virtual está analizando la suma de precios, comprobando la existencia de los fardos y seleccionando el mejor surtido exclusivo para tu negocio.
                     </p>
                   </div>
                 )}
@@ -1447,6 +1516,29 @@ export default function ClientShop({
                           );
                         })}
                       </div>
+
+                      {/* WhatsApp Alternative Action Block */}
+                      <div className="mt-5 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="space-y-1 text-center sm:text-left">
+                          <h5 className="font-extrabold text-slate-900 text-xs sm:text-sm">¿Prefieres una atención personalizada?</h5>
+                          <p className="text-slate-600 font-medium text-[10.5px] leading-normal">
+                            Si estas sugerencias no se adaptan completamente a lo que buscas, puedes contactarnos y nuestro equipo te ayudará directamente a armar el pedido ideal por chat.
+                          </p>
+                        </div>
+                        <a
+                          href={`https://wa.me/${companyInfo.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+                            `Hola, estuve usando el Asesor Virtual y me gustaría recibir una asesoría personalizada. Mi consulta es: "${aiPrompt}"`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-black text-xs sm:text-sm shadow-md transition-all shrink-0 cursor-pointer text-center"
+                        >
+                          <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.1 1.45 4.7 1.452 5.4 0 9.8-4.4 9.8-9.8 0-2.6-1-5.1-2.9-6.9C16.4 2 13.9 1 11.4 1 6 1 1.6 5.4 1.6 10.8c0 1.7.4 3.3 1.3 4.7l-1 3.5 3.7-.9z" />
+                          </svg>
+                          Chatear por WhatsApp
+                        </a>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1455,7 +1547,7 @@ export default function ClientShop({
 
               {/* Footer */}
               <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0">
-                <span className="text-[10px] text-slate-400 font-medium">EcoModa AI utiliza Gemini 3.5 Flash para asistencia</span>
+                <span className="text-[10px] text-slate-400 font-medium">Sugerencias basadas en el inventario disponible</span>
                 <button
                   type="button"
                   disabled={isAiLoading}
